@@ -8,6 +8,9 @@ package Threads;
 import calculate.Edge;
 import calculate.KochFractal;
 import calculate.KochManager;
+import javafx.concurrent.Task;
+import javafx.scene.paint.Color;
+
 import java.util.ArrayList;
 import java.util.Observable;
 import java.util.Observer;
@@ -17,7 +20,7 @@ import java.util.concurrent.Callable;
  *
  * @author michel
  */
-public class GenerateEdge implements Callable<ArrayList<Edge>>, Observer
+public class GenerateEdge extends Task<ArrayList<Edge>> implements Observer
 {
     private KochFractal koch; // nieuwe fractal
     private ArrayList<Edge> edgeList; //list van edges van de onderkant
@@ -46,9 +49,25 @@ public class GenerateEdge implements Callable<ArrayList<Edge>>, Observer
     @Override
     public void update(Observable o, Object o1) // de observer pattern, wordt aangeroepen wanneer hij een edge binnenkrijgt
     {
+
         Edge e = (Edge)o1; //voeg de edge  toe aan zijn eigen lijst
+        Edge e1 = new Edge(e.X1, e.Y1, e.X2, e.Y2, Color.BEIGE );
+
+
+        try
+        {
+            Thread.sleep( koch.getLevel() < 8 ? 1 : 0, koch.getLevel() < 8 ? 0 : 1 );
+        }
+        catch (InterruptedException ex)
+        {
+            //e2.printStackTrace();
+        }
+
+        km.DrawEdge(e1);
         edgeList.add(e);
         count++; //voeg edge toe
+        updateProgress(count, edges);
+        updateMessage("NR of edges : " + count);
         //km.AddEdge(e); //voeg edge toe in de kochmanager
     }
 
@@ -78,9 +97,18 @@ public class GenerateEdge implements Callable<ArrayList<Edge>>, Observer
         if (km.getBar().await() == 0)//Roept de cyclic barrier aan, dit blijft wachten todat hij 3 keer is aangeroepen, de await geeft 0 terug wanneer het de laatste await is, zo weet je dat hij de laatste is
         {
             km.RequestDraw(); // wanneer het de laatste is weet je dat alles klaar is en kan je gaan tekenen
+            km.CalculatingDone();
         }
         
         System.out.println("Thread " + side + " done");
         return edgeList;//dit is niet echt nodig maarja
+    }
+
+    @Override
+    public void cancelled()
+    {
+        super.cancelled();
+        koch.cancel();
+        System.out.println("Cancelled");
     }
 }

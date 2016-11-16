@@ -8,6 +8,7 @@ import calculate.Edge;
 import calculate.KochManager;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -24,6 +25,10 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
+
+import static Threads.GenerateEdge.BOTTOM;
+import static Threads.GenerateEdge.LEFT;
+import static Threads.GenerateEdge.RIGHT;
 
 /**
  * @author Nico Kuijpers
@@ -340,6 +345,37 @@ public class JSF31KochFractalFX extends Application {
                 e.Y2 * zoom + zoomTranslateY,
                 e.color);
     }
+
+    public void SetBind(Task task, int side)
+    {
+        switch (side)
+        {
+            case BOTTOM:
+                progressBarMiddle.progressProperty().bind(task.progressProperty());
+                labelProgressMiddleText.textProperty().bind(task.messageProperty());
+                break;
+            case LEFT:
+                progressBarLeft.progressProperty().bind(task.progressProperty());
+                labelProgressLeftText.textProperty().bind(task.messageProperty());
+                break;
+            case RIGHT:
+                progressBarRight.progressProperty().bind(task.progressProperty());
+                labelProgressRightText.textProperty().bind(task.messageProperty());
+                break;
+        }
+    }
+
+    public void UnbindAll()
+    {
+        progressBarMiddle.progressProperty().unbind();
+        labelProgressMiddleText.textProperty().unbind();
+        progressBarLeft.progressProperty().unbind();
+        labelProgressLeftText.textProperty().unbind();
+        progressBarRight.progressProperty().unbind();
+        labelProgressRightText.textProperty().unbind();
+    }
+
+
 
     /**
      * The main() method is ignored in correctly deployed JavaFX application.

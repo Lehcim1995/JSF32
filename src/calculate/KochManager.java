@@ -8,15 +8,13 @@ package calculate;
 import Threads.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.scene.control.ProgressBar;
 import jsf31kochfractalfx.JSF31KochFractalFX;
 import timeutil.TimeStamp;
 
@@ -41,6 +39,12 @@ public class KochManager
     private final String LEVELSTRING = "------------LEVEL ";
     private final String LEVELSTART = " START-------------";
     private final String LEVELEND = " DONE--------------";
+
+    private Task bottom;
+    private Task left;
+    private Task right;
+
+
     
 
     public KochManager(JSF31KochFractalFX application)
@@ -50,8 +54,16 @@ public class KochManager
         edgeList = new ArrayList<>();
     }
 
-    public void changeLevel(int currentLevel)
+    public synchronized void changeLevel(int currentLevel)
     {
+        if (bottom != null || left != null || right != null)
+        {
+            bottom.cancel();
+            left.cancel();
+            right.cancel();
+            application.UnbindAll();
+        }
+
         calts = new TimeStamp();  //zet timestamp voor bereken fractals
         calts.setBegin(); //start de timestamp
         koch.setLevel(currentLevel); // zet level van de fractal
@@ -60,39 +72,21 @@ public class KochManager
         
         pool = Executors.newFixedThreadPool(SIDES);//Only 3 threads
         bar = new CyclicBarrier(SIDES); //Set en barrier die de treads stillhoud totdat er een bepaald aantal keer de await is aangeroepen
-        
-        Callable bottom = new GenerateEdge(koch.getLevel(), this, GenerateEdge.BOTTOM); // maak meerdere callables aan, dit zijn eidegenlijk gewoon de threads
-        Callable left = new GenerateEdge(koch.getLevel(), this, GenerateEdge.LEFT);
-        Callable right = new GenerateEdge(koch.getLevel(), this, GenerateEdge.RIGHT);
-        
+
+        bottom = new GenerateEdge(koch.getLevel(), this, GenerateEdge.BOTTOM); // maak meerdere callables aan, dit zijn eidegenlijk gewoon de threads
+        left = new GenerateEdge(koch.getLevel(), this, GenerateEdge.LEFT);
+        right = new GenerateEdge(koch.getLevel(), this, GenerateEdge.RIGHT);
+
+        application.SetBind(bottom, GenerateEdge.BOTTOM);
+        application.SetBind(left, GenerateEdge.LEFT);
+        application.SetBind(right, GenerateEdge.RIGHT);
+
         pool.submit(bottom); //voeg de Callables toe aan de threadpool
         pool.submit(left);
         pool.submit(right);
-        
-        /* // dit is niet meer nodig maar ik laat het er wel instaan
-        Future<ArrayList<Edge>> butfut = pool.submit(bottom);
-        Future<ArrayList<Edge>> leftfut = pool.submit(left);
-        Future<ArrayList<Edge>> rightfut = pool.submit(right);
-        
-        try
-        {
-            edgeList.addAll(butfut.get());
-            edgeList.addAll(leftfut.get());
-            edgeList.addAll(rightfut.get());
-        }
-        catch (InterruptedException ex)
-        {
-            Logger.getLogger(KochManager.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        catch (ExecutionException ex)
-        {
-            Logger.getLogger(KochManager.class.getName()).log(Level.SEVERE, null, ex);
-        }*/
-        
+
         pool.shutdown(); // de pool afsluiten want de pool hoeft maar 3 tasks te doen
-        
-        calts.setEnd(); // stop de timestamp
-        application.setTextCalc(calts.toString());
+
         application.setTextNrEdges(koch.getNrOfEdges() + ""); // en zet de  edges goed, dit kan ik verplaatsen tot nadat de fractal klaar is met berekenen maar het werkt hiero ook
     }
 
@@ -109,21 +103,6 @@ public class KochManager
     public synchronized void drawEdges() // tekent alle edges in de lijst
     {
         System.out.println("Draw Start " + koch.getLevel());
-        /*
-        while (count > 0)
-        {
-            try
-            {
-                System.out.println("Lil wait");
-                wait(2);
-                drawEdges();
-            }
-            catch (Exception e)
-            {
-                System.out.println("Error " + e.getMessage());
-            }
-        }*/
-
         timeutil.TimeStamp ts2 = new TimeStamp();
         ts2.setBegin();
         application.clearKochPanel();
@@ -139,9 +118,16 @@ public class KochManager
         application.setTextDraw(ts2.toString());
     }
 
-    public synchronized void DrawEdge(Edge edge)// voor het toevoegen van 1 edge
+    public synchronized void DrawEdge(final Edge edge)// voor het toevoegen van 1 edge
     {
-        application.drawEdge(edge);
+        Platform.runLater(new Runnable() // dit is zodat het op de gui thread wordt uitgevoert, als je dit weghaald werkt het niet.
+        {
+            @Override
+            public void run()
+            {
+                application.drawEdge(edge);
+            }
+        });
     }
     
     public synchronized void AddEdge(Edge edge)// voor het toevoegen van 1 edge
@@ -154,26 +140,17 @@ public class KochManager
     {
         edgeList.addAll(edges);
     }
-    
-    /*
-    public synchronized void increaseCount() // Threads roepen dit aan
-    {
-        count++;
-        if (count == 3) // wanneer alle 3 de  threads klaar zijn
-        {
-            application.requestDrawEdges();// zet een delay op het drawen van edges
-            System.out.println("Klaar " + koch.getLevel());
-            calts.setEnd(); // stop de timestamp
-            Platform.runLater(new Runnable() // dit is zodat het op de gui thread wordt uitgevoert, als je dit weghaald werkt het niet.
-            {
-                @Override
-                public void run()
-                {
-                    application.setTextCalc(calts.toString());
-                }
-            });
 
-            count = 0; //kochmanager is weer klaar om nieuwe fractals the berekenen.
-        }
-    }*/
+    public void CalculatingDone()
+    {
+        Platform.runLater(new Runnable() // dit is zodat het op de gui thread wordt uitgevoert, als je dit weghaald werkt het niet.
+        {
+            @Override
+            public void run()
+            {
+                calts.setEnd(); // stop de timestamp
+                application.setTextCalc(calts.toString());
+            }
+        });
+    }
 }
