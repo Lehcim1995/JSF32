@@ -4,30 +4,31 @@
  */
 package jsf31kochfractalfx;
 
-import calculate.*;
+import calculate.Edge;
+import calculate.KochManager;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
-import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.canvas.*;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.input.*;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
 /**
- *
  * @author Nico Kuijpers
  */
-public class JSF31KochFractalFX extends Application
-{
+public class JSF31KochFractalFX extends Application {
 
     // Zoom and drag
     private double zoomTranslateX = 0.0;
@@ -53,6 +54,16 @@ public class JSF31KochFractalFX extends Application
     private Label labelCalcText;
     private Label labelDraw;
     private Label labelDrawText;
+    private Label labelProgressLeft;
+    private Label labelProgressLeftText;
+    private Label labelProgressMiddle;
+    private Label labelProgressMiddleText;
+    private Label labelProgressRight;
+    private Label labelProgressRightText;
+
+    private ProgressBar progressBarLeft;
+    private ProgressBar progressBarMiddle;
+    private ProgressBar progressBarRight;
 
     // Koch panel and its size
     private Canvas kochPanel;
@@ -60,13 +71,10 @@ public class JSF31KochFractalFX extends Application
     private final int kpHeight = 500;
 
     @Override
-    public void start(Stage primaryStage)
-    {
-        EventHandler<WindowEvent> event = new EventHandler<WindowEvent>()
-        {
+    public void start(Stage primaryStage) {
+        EventHandler<WindowEvent> event = new EventHandler<WindowEvent>() {
             @Override
-            public void handle(WindowEvent event)
-            {
+            public void handle(WindowEvent event) {
                 System.exit(0);
             }
         };
@@ -112,11 +120,9 @@ public class JSF31KochFractalFX extends Application
         // Button to increase level of Koch fractal
         Button buttonIncreaseLevel = new Button();
         buttonIncreaseLevel.setText("Increase Level");
-        buttonIncreaseLevel.setOnAction(new EventHandler<ActionEvent>()
-        {
+        buttonIncreaseLevel.setOnAction(new EventHandler<ActionEvent>() {
             @Override
-            public void handle(ActionEvent event)
-            {
+            public void handle(ActionEvent event) {
                 increaseLevelButtonActionPerformed(event);
             }
         });
@@ -125,11 +131,9 @@ public class JSF31KochFractalFX extends Application
         // Button to decrease level of Koch fractal
         Button buttonDecreaseLevel = new Button();
         buttonDecreaseLevel.setText("Decrease Level");
-        buttonDecreaseLevel.setOnAction(new EventHandler<ActionEvent>()
-        {
+        buttonDecreaseLevel.setOnAction(new EventHandler<ActionEvent>() {
             @Override
-            public void handle(ActionEvent event)
-            {
+            public void handle(ActionEvent event) {
                 decreaseLevelButtonActionPerformed(event);
             }
         });
@@ -138,44 +142,60 @@ public class JSF31KochFractalFX extends Application
         // Button to fit Koch fractal in Koch panel
         Button buttonFitFractal = new Button();
         buttonFitFractal.setText("Fit Fractal");
-        buttonFitFractal.setOnAction(new EventHandler<ActionEvent>()
-        {
+        buttonFitFractal.setOnAction(new EventHandler<ActionEvent>() {
             @Override
-            public void handle(ActionEvent event)
-            {
+            public void handle(ActionEvent event) {
                 fitFractalButtonActionPerformed(event);
             }
         });
         grid.add(buttonFitFractal, 14, 6);
 
+        labelProgressLeft = new Label("Progress left:");
+        labelProgressLeftText = new Label();
+        grid.add(labelProgressLeft, 0, 8, 4, 1);
+        grid.add(labelProgressLeftText, 6, 8, 22, 1);
+
+        progressBarLeft = new ProgressBar(0);
+        grid.add(progressBarLeft, 4, 8);
+
+        labelProgressMiddle = new Label("Progress middle:");
+        labelProgressMiddleText = new Label();
+        grid.add(labelProgressMiddle, 0, 9, 4, 1);
+        grid.add(labelProgressMiddleText, 6, 9, 22, 1);
+
+        progressBarMiddle = new ProgressBar(0);
+        grid.add(progressBarMiddle, 4, 9);
+
+        labelProgressRight = new Label("Progress right:");
+        labelProgressRightText = new Label();
+        grid.add(labelProgressRight, 0, 10, 4, 1);
+        grid.add(labelProgressRightText, 6, 10, 22, 1);
+
+        progressBarRight = new ProgressBar(0);
+        grid.add(progressBarRight, 4, 10);
+
         // Add mouse clicked event to Koch panel
         kochPanel.addEventHandler(MouseEvent.MOUSE_CLICKED,
-                new EventHandler<MouseEvent>()
-        {
-            @Override
-            public void handle(MouseEvent event)
-            {
-                kochPanelMouseClicked(event);
-            }
-        });
+                new EventHandler<MouseEvent>() {
+                    @Override
+                    public void handle(MouseEvent event) {
+                        kochPanelMouseClicked(event);
+                    }
+                });
 
         // Add mouse pressed event to Koch panel
         kochPanel.addEventHandler(MouseEvent.MOUSE_PRESSED,
-                new EventHandler<MouseEvent>()
-        {
-            @Override
-            public void handle(MouseEvent event)
-            {
-                kochPanelMousePressed(event);
-            }
-        });
+                new EventHandler<MouseEvent>() {
+                    @Override
+                    public void handle(MouseEvent event) {
+                        kochPanelMousePressed(event);
+                    }
+                });
 
         // Add mouse dragged event to Koch panel
-        kochPanel.setOnMouseDragged(new EventHandler<MouseEvent>()
-        {
+        kochPanel.setOnMouseDragged(new EventHandler<MouseEvent>() {
             @Override
-            public void handle(MouseEvent event)
-            {
+            public void handle(MouseEvent event) {
                 kochPanelMouseDragged(event);
             }
         });
@@ -187,7 +207,7 @@ public class JSF31KochFractalFX extends Application
 
         // Create the scene and add the grid pane
         Group root = new Group();
-        Scene scene = new Scene(root, kpWidth + 50, kpHeight + 170);
+        Scene scene = new Scene(root, kpWidth + 100, kpHeight + 275);
         root.getChildren().add(grid);
 
         // Define title and assign the scene for main window
@@ -196,16 +216,14 @@ public class JSF31KochFractalFX extends Application
         primaryStage.show();
     }
 
-    public void clearKochPanel()
-    {
+    public void clearKochPanel() {
         GraphicsContext gc = kochPanel.getGraphicsContext2D();
         gc.clearRect(0.0, 0.0, kpWidth, kpHeight);
         gc.setFill(Color.BLACK);
         gc.fillRect(0.0, 0.0, kpWidth, kpHeight);
     }
 
-    public void drawEdge(Edge e)
-    {
+    public void drawEdge(Edge e) {
         // Graphics
         GraphicsContext gc = kochPanel.getGraphicsContext2D();
 
@@ -216,16 +234,11 @@ public class JSF31KochFractalFX extends Application
         gc.setStroke(e1.color);
 
         // Set line width depending on level
-        if (currentLevel <= 3)
-        {
+        if (currentLevel <= 3) {
             gc.setLineWidth(1.5);
-        }
-        else if (currentLevel <= 5)
-        {
+        } else if (currentLevel <= 5) {
             gc.setLineWidth(1.0);
-        }
-        else
-        {
+        } else {
             gc.setLineWidth(.5);
         }
 
@@ -234,40 +247,31 @@ public class JSF31KochFractalFX extends Application
 
     }
 
-    public void setTextNrEdges(String text)
-    {
+    public void setTextNrEdges(String text) {
         labelNrEdgesText.setText(text);
     }
 
-    public void setTextCalc(String text)
-    {
+    public void setTextCalc(String text) {
         labelCalcText.setText(text);
     }
 
-    public void setTextDraw(String text)
-    {
+    public void setTextDraw(String text) {
         labelDrawText.setText(text);
     }
 
-    public void requestDrawEdges()
-    {
-        synchronized (this)
-        {
-            Platform.runLater(new Runnable()
-            {
+    public void requestDrawEdges() {
+        synchronized (this) {
+            Platform.runLater(new Runnable() {
                 @Override
-                public void run()
-                {
+                public void run() {
                     kochManager.drawEdges();
                 }
             });
         }
     }
 
-    private void increaseLevelButtonActionPerformed(ActionEvent event)
-    {
-        if (currentLevel < 12)
-        {
+    private void increaseLevelButtonActionPerformed(ActionEvent event) {
+        if (currentLevel < 12) {
             // resetZoom();
             currentLevel++;
             labelLevel.setText("Level: " + currentLevel);
@@ -275,10 +279,8 @@ public class JSF31KochFractalFX extends Application
         }
     }
 
-    private void decreaseLevelButtonActionPerformed(ActionEvent event)
-    {
-        if (currentLevel > 1)
-        {
+    private void decreaseLevelButtonActionPerformed(ActionEvent event) {
+        if (currentLevel > 1) {
             // resetZoom();
             currentLevel--;
             labelLevel.setText("Level: " + currentLevel);
@@ -286,25 +288,19 @@ public class JSF31KochFractalFX extends Application
         }
     }
 
-    private void fitFractalButtonActionPerformed(ActionEvent event)
-    {
+    private void fitFractalButtonActionPerformed(ActionEvent event) {
         resetZoom();
         kochManager.drawEdges();
     }
 
-    private void kochPanelMouseClicked(MouseEvent event)
-    {
+    private void kochPanelMouseClicked(MouseEvent event) {
         if (Math.abs(event.getX() - startPressedX) < 1.0
-                && Math.abs(event.getY() - startPressedY) < 1.0)
-        {
+                && Math.abs(event.getY() - startPressedY) < 1.0) {
             double originalPointClickedX = (event.getX() - zoomTranslateX) / zoom;
             double originalPointClickedY = (event.getY() - zoomTranslateY) / zoom;
-            if (event.getButton() == MouseButton.PRIMARY)
-            {
+            if (event.getButton() == MouseButton.PRIMARY) {
                 zoom *= 2.0;
-            }
-            else if (event.getButton() == MouseButton.SECONDARY)
-            {
+            } else if (event.getButton() == MouseButton.SECONDARY) {
                 zoom /= 2.0;
             }
             zoomTranslateX = (int) (event.getX() - originalPointClickedX * zoom);
@@ -313,8 +309,7 @@ public class JSF31KochFractalFX extends Application
         }
     }
 
-    private void kochPanelMouseDragged(MouseEvent event)
-    {
+    private void kochPanelMouseDragged(MouseEvent event) {
         zoomTranslateX = zoomTranslateX + event.getX() - lastDragX;
         zoomTranslateY = zoomTranslateY + event.getY() - lastDragY;
         lastDragX = event.getX();
@@ -323,24 +318,21 @@ public class JSF31KochFractalFX extends Application
         requestDrawEdges();
     }
 
-    private void kochPanelMousePressed(MouseEvent event)
-    {
+    private void kochPanelMousePressed(MouseEvent event) {
         startPressedX = event.getX();
         startPressedY = event.getY();
         lastDragX = event.getX();
         lastDragY = event.getY();
     }
 
-    private void resetZoom()
-    {
+    private void resetZoom() {
         int kpSize = Math.min(kpWidth, kpHeight);
         zoom = kpSize;
         zoomTranslateX = (kpWidth - kpSize) / 2.0;
         zoomTranslateY = (kpHeight - kpSize) / 2.0;
     }
 
-    private Edge edgeAfterZoomAndDrag(Edge e)
-    {
+    private Edge edgeAfterZoomAndDrag(Edge e) {
         return new Edge(
                 e.X1 * zoom + zoomTranslateX,
                 e.Y1 * zoom + zoomTranslateY,
@@ -357,8 +349,7 @@ public class JSF31KochFractalFX extends Application
      *
      * @param args the command line arguments
      */
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         launch(args);
     }
 }
