@@ -14,7 +14,6 @@ import javafx.scene.paint.Color;
 import java.util.ArrayList;
 import java.util.Observable;
 import java.util.Observer;
-import java.util.concurrent.Callable;
 
 /**
  *
@@ -74,7 +73,7 @@ public class GenerateEdge extends Task<ArrayList<Edge>> implements Observer
     @Override
     public ArrayList<Edge> call() throws Exception
     {
-        switch(side) //selecteerd de goede zijde
+        /*switch(side) //selecteerd de goede zijde
         {
             case BOTTOM:
                 koch.generateBottomEdge(); // start generaton
@@ -100,7 +99,7 @@ public class GenerateEdge extends Task<ArrayList<Edge>> implements Observer
             km.CalculatingDone();
         }
         
-        System.out.println("Thread " + side + " done");
+        System.out.println("Thread " + side + " done");*/
         return edgeList;//dit is niet echt nodig maarja
     }
 

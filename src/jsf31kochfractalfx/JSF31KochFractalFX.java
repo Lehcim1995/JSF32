@@ -26,9 +26,7 @@ import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
-import static Threads.GenerateEdge.BOTTOM;
-import static Threads.GenerateEdge.LEFT;
-import static Threads.GenerateEdge.RIGHT;
+import static Threads.GenerateEdge.*;
 
 /**
  * @author Nico Kuijpers
@@ -75,6 +73,8 @@ public class JSF31KochFractalFX extends Application {
     private final int kpWidth = 500;
     private final int kpHeight = 500;
 
+    private Stage stage;
+
     @Override
     public void start(Stage primaryStage) {
         EventHandler<WindowEvent> event = new EventHandler<WindowEvent>() {
@@ -85,6 +85,8 @@ public class JSF31KochFractalFX extends Application {
         };
 
         primaryStage.setOnCloseRequest(event);
+
+        stage = primaryStage;
 
         // Define grid pane      
         GridPane grid;
@@ -123,26 +125,15 @@ public class JSF31KochFractalFX extends Application {
         grid.add(labelLevel, 0, 6);
 
         // Button to increase level of Koch fractal
-        Button buttonIncreaseLevel = new Button();
-        buttonIncreaseLevel.setText("Increase Level");
-        buttonIncreaseLevel.setOnAction(new EventHandler<ActionEvent>() {
+        Button buttonChangeFile = new Button();
+        buttonChangeFile.setText("Load File");
+        buttonChangeFile.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
-                increaseLevelButtonActionPerformed(event);
+                changeFileButtonActionPerformed(event);
             }
         });
-        grid.add(buttonIncreaseLevel, 3, 6);
-
-        // Button to decrease level of Koch fractal
-        Button buttonDecreaseLevel = new Button();
-        buttonDecreaseLevel.setText("Decrease Level");
-        buttonDecreaseLevel.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-                decreaseLevelButtonActionPerformed(event);
-            }
-        });
-        grid.add(buttonDecreaseLevel, 5, 6);
+        grid.add(buttonChangeFile, 3, 6);
 
         // Button to fit Koch fractal in Koch panel
         Button buttonFitFractal = new Button();
@@ -264,6 +255,10 @@ public class JSF31KochFractalFX extends Application {
         labelDrawText.setText(text);
     }
 
+    public void setTextLevel(String text) {
+        labelLevel.setText(text);
+    }
+
     public void requestDrawEdges() {
         synchronized (this) {
             Platform.runLater(new Runnable() {
@@ -275,13 +270,8 @@ public class JSF31KochFractalFX extends Application {
         }
     }
 
-    private void increaseLevelButtonActionPerformed(ActionEvent event) {
-        if (currentLevel < 12) {
-            // resetZoom();
-            currentLevel++;
-            labelLevel.setText("Level: " + currentLevel);
-            kochManager.changeLevel(currentLevel);
-        }
+    private void changeFileButtonActionPerformed(ActionEvent event) {
+        kochManager.changeLevel(0);
     }
 
     private void decreaseLevelButtonActionPerformed(ActionEvent event) {
@@ -346,10 +336,8 @@ public class JSF31KochFractalFX extends Application {
                 e.color);
     }
 
-    public void SetBind(Task task, int side)
-    {
-        switch (side)
-        {
+    public void SetBind(Task task, int side) {
+        switch (side) {
             case BOTTOM:
                 progressBarMiddle.progressProperty().bind(task.progressProperty());
                 labelProgressMiddleText.textProperty().bind(task.messageProperty());
@@ -365,8 +353,7 @@ public class JSF31KochFractalFX extends Application {
         }
     }
 
-    public void UnbindAll()
-    {
+    public void UnbindAll() {
         progressBarMiddle.progressProperty().unbind();
         labelProgressMiddleText.textProperty().unbind();
         progressBarLeft.progressProperty().unbind();
@@ -375,7 +362,9 @@ public class JSF31KochFractalFX extends Application {
         labelProgressRightText.textProperty().unbind();
     }
 
-
+    public Stage getStage() {
+        return stage;
+    }
 
     /**
      * The main() method is ignored in correctly deployed JavaFX application.

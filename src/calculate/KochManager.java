@@ -5,18 +5,16 @@
  */
 package calculate;
 
-import Threads.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
+import Threads.ReadDrawEdge;
 import javafx.application.Platform;
-import javafx.concurrent.Task;
-import javafx.scene.control.ProgressBar;
+import javafx.stage.FileChooser;
 import jsf31kochfractalfx.JSF31KochFractalFX;
 import timeutil.TimeStamp;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 /**
  *
@@ -26,26 +24,15 @@ public class KochManager
 {
 
     private KochFractal koch; //De fractal, niet echt meer nodig in dit geval maar ik laat het er toch in.
-    private ArrayList<Edge> edgeList; // De gezamelijke lijst van edges voor de fractal
+    private List<Edge> edgeList; // De gezamelijke lijst van edges voor de fractal
     private JSF31KochFractalFX application; // de  applicatie zelf
 
     private timeutil.TimeStamp calts; // timestap voor het berekenen van de fractal
-    private CyclicBarrier bar;
-    private ExecutorService pool;
 
-    private int count = 0; // voor het bijhouden van hoeveel threads er klaar zijn
-    
     private final int SIDES = 3;
     private final String LEVELSTRING = "------------LEVEL ";
     private final String LEVELSTART = " START-------------";
     private final String LEVELEND = " DONE--------------";
-
-    private Task bottom;
-    private Task left;
-    private Task right;
-
-
-    
 
     public KochManager(JSF31KochFractalFX application)
     {
@@ -56,45 +43,28 @@ public class KochManager
 
     public synchronized void changeLevel(int currentLevel)
     {
-        if (bottom != null || left != null || right != null)
-        {
-            bottom.cancel();
-            left.cancel();
-            right.cancel();
-            application.UnbindAll();
-        }
+        int edges = 0;
 
-        calts = new TimeStamp();  //zet timestamp voor bereken fractals
-        calts.setBegin(); //start de timestamp
-        koch.setLevel(currentLevel); // zet level van de fractal
-        edgeList.clear(); //clear list
-        System.out.println(LEVELSTRING + koch.getLevel() + LEVELSTART);
-        
-        pool = Executors.newFixedThreadPool(SIDES);//Only 3 threads
-        bar = new CyclicBarrier(SIDES); //Set en barrier die de treads stillhoud totdat er een bepaald aantal keer de await is aangeroepen
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("File");
+        File file = fileChooser.showOpenDialog(application.getStage());
 
-        bottom = new GenerateEdge(koch.getLevel(), this, GenerateEdge.BOTTOM); // maak meerdere callables aan, dit zijn eidegenlijk gewoon de threads
-        left = new GenerateEdge(koch.getLevel(), this, GenerateEdge.LEFT);
-        right = new GenerateEdge(koch.getLevel(), this, GenerateEdge.RIGHT);
+        application.clearKochPanel();
 
-        application.SetBind(bottom, GenerateEdge.BOTTOM);
-        application.SetBind(left, GenerateEdge.LEFT);
-        application.SetBind(right, GenerateEdge.RIGHT);
+        ReadDrawEdge future = new ReadDrawEdge(file, koch, this);
 
-        pool.submit(bottom); //voeg de Callables toe aan de threadpool
-        pool.submit(left);
-        pool.submit(right);
+        ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(1);
+        threadPoolExecutor.submit(future);
 
-        pool.shutdown(); // de pool afsluiten want de pool hoeft maar 3 tasks te doen
+        threadPoolExecutor.shutdown();
 
-        application.setTextNrEdges(koch.getNrOfEdges() + ""); // en zet de  edges goed, dit kan ik verplaatsen tot nadat de fractal klaar is met berekenen maar het werkt hiero ook
+        /*try {
+            edgeList = future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }*/
     }
 
-    public CyclicBarrier getBar()
-    {
-        return bar;
-    }
-    
     public void RequestDraw()
     {
         application.requestDrawEdges();
@@ -152,5 +122,9 @@ public class KochManager
                 application.setTextCalc(calts.toString());
             }
         });
+    }
+
+    public JSF31KochFractalFX getApplication() {
+        return application;
     }
 }
