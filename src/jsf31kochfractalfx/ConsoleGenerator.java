@@ -2,10 +2,11 @@ package jsf31kochfractalfx;
 
 import calculate.Edge;
 import calculate.KochFractal;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import timeutil.TimeStamp;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.util.*;
 
 public class ConsoleGenerator implements Observer {
@@ -32,26 +33,70 @@ public class ConsoleGenerator implements Observer {
 
         fractal.addObserver(this);
 
-        System.out.println("Generating " + System.currentTimeMillis());
+        TimeStamp timeStamp = new TimeStamp();
+        timeStamp.setBegin("Generate start");
 
         fractal.generateLeftEdge();
         fractal.generateBottomEdge();
         fractal.generateRightEdge();
 
-        System.out.println("Writing " + System.currentTimeMillis());
+        timeStamp.setEnd("Generate end");
+
+        System.out.println("Generate " + timeStamp.toString());
+
+        timeStamp.init();
+
+        timeStamp.setBegin("Writing start");
 
         try (FileOutputStream outputStream = new FileOutputStream(filename)) {
-            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream)) {
-                objectOutputStream.writeInt(level);
-                for (Edge edge : edges) {
-                    objectOutputStream.writeObject(edge);
+            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream)) {
+                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(bufferedOutputStream)) {
+                    objectOutputStream.writeInt(level);
+                    for (Edge edge : edges) {
+                        objectOutputStream.writeObject(edge);
+                    }
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        System.out.println("Done " + System.currentTimeMillis());
+        timeStamp.setEnd("Writing end");
+
+        System.out.println("Writing " + timeStamp.toString());
+
+        timeStamp.init();
+
+        timeStamp.setBegin("Serializing JSON start");
+
+        Gson gson = new Gson();
+
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("level", level);
+        jsonObject.add("edges", gson.toJsonTree(edges));
+        String json = gson.toJson(jsonObject);
+
+        timeStamp.setEnd("Serializing JSON end");
+
+        System.out.println("Serializing JSON " + timeStamp.toString());
+
+        timeStamp.init();
+
+        timeStamp.setBegin("Writing JSON start");
+
+        try (FileOutputStream outputStream = new FileOutputStream(filename + ".json")) {
+            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream)) {
+                try (OutputStreamWriter outputStreamWriter = new OutputStreamWriter(bufferedOutputStream)) {
+                    outputStreamWriter.write(json);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        timeStamp.setEnd("Writing JSON end");
+
+        System.out.println("Writing JSON " + timeStamp.toString());
     }
 
     public static void main(String[] args) {
