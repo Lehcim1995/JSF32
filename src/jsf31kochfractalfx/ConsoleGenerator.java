@@ -7,6 +7,8 @@ import com.google.gson.JsonObject;
 import timeutil.TimeStamp;
 
 import java.io.*;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.*;
 
 public class ConsoleGenerator implements Observer {
@@ -46,18 +48,40 @@ public class ConsoleGenerator implements Observer {
 
         timeStamp.init();
 
-        timeStamp.setBegin("Writing start");
 
-        try (FileOutputStream outputStream = new FileOutputStream(filename)) {
-            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream)) {
-                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(bufferedOutputStream)) {
-                    objectOutputStream.writeInt(level);
-                    for (Edge edge : edges) {
-                        objectOutputStream.writeObject(edge);
-                    }
+
+
+
+        //Binary
+        try (ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream())
+        {
+            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream))
+            {
+                objectOutputStream.writeInt(level);
+
+                for (Edge edge : edges)
+                {
+                    objectOutputStream.writeObject(edge);
                 }
             }
-        } catch (IOException e) {
+
+            timeStamp.setBegin("Writing start");
+            File f = new File(filename);
+            f.delete();
+
+            FileChannel fc = new RandomAccessFile(f, "rw").getChannel();
+
+            byte[] mymem = byteOutputStream.toByteArray(); // in bytes
+            long buffer = 8 * mymem.length; // buffer size
+            System.out.println("Buffer bytes : " + buffer);
+            MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, 0, buffer);
+
+            mem.put(mymem);
+
+            fc.close();
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
 
