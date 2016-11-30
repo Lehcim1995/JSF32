@@ -12,6 +12,8 @@ import javafx.scene.paint.Color;
 import timeutil.TimeStamp;
 
 import java.io.*;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -22,6 +24,7 @@ public class ReadDrawEdge extends Task<List<Edge>> {
     private File file;
     private KochFractal koch;
     private KochManager kochManager;
+    private TimeStamp ts;
 
     private List<Edge> edgeList = new ArrayList<>();
     private int edges = 0;
@@ -122,9 +125,27 @@ public class ReadDrawEdge extends Task<List<Edge>> {
     }
 
     private void readBinary(String filename, ExecutorService executorService) {
-        try (FileInputStream inputStream = new FileInputStream(filename)) {
-            try (BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream)) {
-                try (ObjectInputStream objectInputStream = new ObjectInputStream(bufferedInputStream)) {
+
+        ts = new TimeStamp();
+        ts.setBegin();
+
+        try
+        {
+            File file = new File(filename);
+            FileChannel fc = new RandomAccessFile(file, "r").getChannel();
+
+            long buffer = file.length();
+            MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_ONLY, 0, buffer);
+
+            byte[] edgesb = new byte[mem.remaining()];
+            mem.get(edgesb);
+
+            ts.setEnd("End read Binary");
+            System.out.println(ts.toString());
+
+            try (ByteArrayInputStream bait = new ByteArrayInputStream(edgesb))
+            {
+                try (ObjectInputStream objectInputStream = new ObjectInputStream(bait)) {
                     koch.setLevel(objectInputStream.readInt());
 
                     edges = koch.getNrOfEdges();
@@ -139,10 +160,14 @@ public class ReadDrawEdge extends Task<List<Edge>> {
                         executorService.submit(new EdgeDrawer(drawEdge));
                     }
                 }
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
+                catch (ClassNotFoundException e)
+                {
+                    e.printStackTrace();
+                }
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

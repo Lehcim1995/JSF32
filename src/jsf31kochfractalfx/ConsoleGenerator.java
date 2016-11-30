@@ -72,7 +72,7 @@ public class ConsoleGenerator implements Observer {
             FileChannel fc = new RandomAccessFile(f, "rw").getChannel();
 
             byte[] mymem = byteOutputStream.toByteArray(); // in bytes
-            long buffer = 8 * mymem.length; // buffer size
+            long buffer = mymem.length; // buffer size
             System.out.println("Buffer bytes : " + buffer);
             MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, 0, buffer);
 
