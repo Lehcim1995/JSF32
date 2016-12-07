@@ -14,6 +14,7 @@ import timeutil.TimeStamp;
 import java.io.*;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -131,7 +132,7 @@ public class ReadDrawEdge extends Task<List<Edge>> {
 
         try {
             File file = new File(filename);
-            FileChannel fc = new RandomAccessFile(file, "r").getChannel();
+            FileChannel fc = new RandomAccessFile(file, "rw").getChannel();
 
             // Read int
             MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_ONLY, 0, 10);
@@ -151,27 +152,48 @@ public class ReadDrawEdge extends Task<List<Edge>> {
 
             // Read edges
             do {
-                mem = fc.map(FileChannel.MapMode.READ_ONLY, lastPos, fc.size() - lastPos);
+                long size = fc.size();
+                mem = fc.map(FileChannel.MapMode.READ_ONLY, lastPos, size - lastPos);
+
+                System.out.println("Waiting for lock");
+                FileLock lock = fc.lock(lastPos, size - lastPos, false);
+                System.out.println("Got lock");
 
                 byte[] edgesb = new byte[mem.remaining()];
                 mem.get(edgesb);
 
                 try (ByteArrayInputStream bait = new ByteArrayInputStream(edgesb)) {
-                    try (ObjectInputStream objectInputStream = new ObjectInputStream(bait)) {
-                        for (;;) {
-                            Edge e = (Edge) objectInputStream.readObject();
-                            edgeList.add(e);
+                    boolean dataAvailable = true;
+                    do {
+                        try (ObjectInputStream objectInputStream = new ObjectInputStream(bait)) {
+                            for (int i = 0; i < (edges > 100 ? edges / 100 : edges); i++) {
+                                Edge e = (Edge) objectInputStream.readObject();
+                                edgeList.add(e);
 
-                            Edge drawEdge = new Edge(e.X1, e.Y1, e.X2, e.Y2, Color.BEIGE);
+                                //Edge drawEdge = new Edge(e.X1, e.Y1, e.X2, e.Y2, Color.BEIGE);
 
-                            executorService.submit(new EdgeDrawer(drawEdge));
+                                executorService.submit(new EdgeDrawer(e));
+                            }
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                        } catch (EOFException e) {
+                            dataAvailable = false;
+
+                            System.out.println("EOFException. " + edgeList.size() + "/" + edges);
+                            try {
+                                Thread.sleep(10);
+                            } catch (InterruptedException e1) {
+                                e1.printStackTrace();
+                            }
+                        } catch (StreamCorruptedException e) {
+                            System.out.println("Corrupted. " + edgeList.size() + "/" + edges);
                         }
-                    } catch (ClassNotFoundException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        System.out.println("IOExcepiton caught, got " + edgeList.size() + "/" + edges + " reading next buffer");
-                    }
+                    } while (dataAvailable);
                 }
+
+                lock.release();
+
+                lastPos = size;
             } while (edgeList.size() < edges);
 
             ts.setEnd("End read Binary");

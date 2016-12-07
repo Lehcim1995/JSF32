@@ -41,6 +41,8 @@ public class ConsoleGenerator implements Observer {
         fractal.generateBottomEdge();
         fractal.generateRightEdge();
 
+        int edgeCount = fractal.getNrOfEdges();
+
         timeStamp.setEnd("Generate end");
 
         System.out.println("Generate " + timeStamp.toString());
@@ -78,11 +80,13 @@ public class ConsoleGenerator implements Observer {
 
                 toWrite.add(edge);
 
-                if (i % 1000 == 0) {
+                if (i % (edgeCount > 100 ? edgeCount / 100 : edgeCount) == 0) {
                     try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
                         for (Edge writeEdge : toWrite) {
                             objectOutputStream.writeObject(writeEdge);
                         }
+
+                        toWrite.clear();
 
                         int newLastPos = byteOutputStream.size();
                         int size = newLastPos - lastPos;
@@ -93,27 +97,29 @@ public class ConsoleGenerator implements Observer {
                         mem.put(byteOutputStream.toByteArray(), lastPos, size);
 
                         lock.release();
+
+                        System.out.println("Writing from " + lastPos + " to " + newLastPos + ".\n Wrote " + i + " edges.");
                         lastPos = newLastPos;
                     }
                 }
             }
 
-            if (lastPos != byteOutputStream.size()) {
-                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
-                    for (Edge writeEdge : toWrite) {
-                        objectOutputStream.writeObject(writeEdge);
-                    }
-
-                    int newLastPos = byteOutputStream.size();
-                    int size = newLastPos - lastPos;
-
-                    MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, lastPos, size);
-                    FileLock lock = fc.lock(lastPos, size, false);
-
-                    mem.put(byteOutputStream.toByteArray(), lastPos, size);
-
-                    lock.release();
+            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
+                for (Edge writeEdge : toWrite) {
+                    objectOutputStream.writeObject(writeEdge);
                 }
+
+                int newLastPos = byteOutputStream.size();
+                int size = newLastPos - lastPos;
+
+                MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, lastPos, size);
+                FileLock lock = fc.lock(lastPos, size, false);
+
+                mem.put(byteOutputStream.toByteArray(), lastPos, size);
+
+                lock.release();
+
+                System.out.println("Writing from " + lastPos + " to " + newLastPos + ".\n Wrote " + i + " edges.");
             }
 
             fc.close();
