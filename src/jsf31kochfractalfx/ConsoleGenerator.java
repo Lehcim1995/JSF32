@@ -7,13 +7,12 @@ import timeutil.TimeStamp;
 import java.io.*;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.*;
 
 public class ConsoleGenerator implements Observer {
 
     private List<Edge> edges = new ArrayList<>();
-
-    public static final String TMP_POSTFIX = ".tmp";
 
     public ConsoleGenerator() {
 
@@ -49,45 +48,83 @@ public class ConsoleGenerator implements Observer {
         timeStamp.init();
 
 
-
-
-
         //Binary
-        try (ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream())
-        {
-            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream))
-            {
-                objectOutputStream.writeInt(level);
-
-                for (Edge edge : edges)
-                {
-                    objectOutputStream.writeObject(edge);
-                }
-            }
-
+        try (ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream()) {
             timeStamp.setBegin("Writing start");
-            File f = new File(filename + TMP_POSTFIX);
+            File f = new File(filename);
             f.delete();
 
             FileChannel fc = new RandomAccessFile(f, "rw").getChannel();
 
-            byte[] mymem = byteOutputStream.toByteArray(); // in bytes
-            long buffer = mymem.length; // buffer size
-            System.out.println("Buffer bytes : " + buffer);
-            MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, 0, buffer);
+            int lastPos = byteOutputStream.size();
 
-            mem.put(mymem);
+            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
+                objectOutputStream.writeInt(level);
+
+                System.out.println(byteOutputStream.size());
+
+                MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, 0, lastPos);
+                FileLock lock = fc.lock(0, lastPos, false);
+                mem.put(byteOutputStream.toByteArray(), 0, lastPos);
+                lock.release();
+
+            }
+            int i = 0;
+
+            List<Edge> toWrite = new ArrayList<>();
+
+            for (Edge edge : edges) {
+                i++;
+
+                toWrite.add(edge);
+
+                if (i % 1000 == 0) {
+                    try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
+                        for (Edge writeEdge : toWrite) {
+                            objectOutputStream.writeObject(writeEdge);
+                        }
+
+                        int newLastPos = byteOutputStream.size();
+                        int size = newLastPos - lastPos;
+
+                        MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, lastPos, size);
+                        FileLock lock = fc.lock(lastPos, size, false);
+
+                        mem.put(byteOutputStream.toByteArray(), lastPos, size);
+
+                        lock.release();
+                        lastPos = newLastPos;
+                    }
+                }
+            }
+
+            if (lastPos != byteOutputStream.size()) {
+                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
+                    for (Edge writeEdge : toWrite) {
+                        objectOutputStream.writeObject(writeEdge);
+                    }
+
+                    int newLastPos = byteOutputStream.size();
+                    int size = newLastPos - lastPos;
+
+                    MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, lastPos, size);
+                    FileLock lock = fc.lock(lastPos, size, false);
+
+                    mem.put(byteOutputStream.toByteArray(), lastPos, size);
+
+                    lock.release();
+                }
+            }
 
             fc.close();
-Thread.sleep(15000);
-            f.renameTo(new File(filename));
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+
+        } catch (IOException e) {
             e.printStackTrace();
         }
+
+        /*byte[] mymem = byteOutputStream.toByteArray(); // in bytes
+        long buffer = mymem.length; // buffer size
+        System.out.println("Buffer bytes : " + buffer);*/
 
         timeStamp.setEnd("Writing end");
 

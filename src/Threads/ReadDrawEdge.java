@@ -129,45 +129,54 @@ public class ReadDrawEdge extends Task<List<Edge>> {
         ts = new TimeStamp();
         ts.setBegin();
 
-        try
-        {
+        try {
             File file = new File(filename);
             FileChannel fc = new RandomAccessFile(file, "r").getChannel();
 
-            long buffer = file.length();
-            MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_ONLY, 0, buffer);
+            // Read int
+            MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_ONLY, 0, 10);
 
-            byte[] edgesb = new byte[mem.remaining()];
-            mem.get(edgesb);
+            byte[] bytes = new byte[mem.remaining()];
+            mem.get(bytes);
 
-            ts.setEnd("End read Binary");
-            System.out.println(ts.toString());
-
-            try (ByteArrayInputStream bait = new ByteArrayInputStream(edgesb))
-            {
+            try (ByteArrayInputStream bait = new ByteArrayInputStream(bytes)) {
                 try (ObjectInputStream objectInputStream = new ObjectInputStream(bait)) {
                     koch.setLevel(objectInputStream.readInt());
 
                     edges = koch.getNrOfEdges();
                     edgeList.clear();
-
-                    for (int i = 0; i < edges; i++) {
-                        Edge e = (Edge) objectInputStream.readObject();
-                        edgeList.add(e);
-
-                        Edge drawEdge = new Edge(e.X1, e.Y1, e.X2, e.Y2, Color.BEIGE);
-
-                        executorService.submit(new EdgeDrawer(drawEdge));
-                    }
-                }
-                catch (ClassNotFoundException e)
-                {
-                    e.printStackTrace();
                 }
             }
-        }
-        catch (IOException e)
-        {
+            long lastPos = 10;
+
+            // Read edges
+            do {
+                mem = fc.map(FileChannel.MapMode.READ_ONLY, lastPos, fc.size() - lastPos);
+
+                byte[] edgesb = new byte[mem.remaining()];
+                mem.get(edgesb);
+
+                try (ByteArrayInputStream bait = new ByteArrayInputStream(edgesb)) {
+                    try (ObjectInputStream objectInputStream = new ObjectInputStream(bait)) {
+                        for (;;) {
+                            Edge e = (Edge) objectInputStream.readObject();
+                            edgeList.add(e);
+
+                            Edge drawEdge = new Edge(e.X1, e.Y1, e.X2, e.Y2, Color.BEIGE);
+
+                            executorService.submit(new EdgeDrawer(drawEdge));
+                        }
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        System.out.println("IOExcepiton caught, got " + edgeList.size() + "/" + edges + " reading next buffer");
+                    }
+                }
+            } while (edgeList.size() < edges);
+
+            ts.setEnd("End read Binary");
+            System.out.println(ts.toString());
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
