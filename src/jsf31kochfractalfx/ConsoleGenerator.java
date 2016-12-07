@@ -2,8 +2,6 @@ package jsf31kochfractalfx;
 
 import calculate.Edge;
 import calculate.KochFractal;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import timeutil.TimeStamp;
 
 import java.io.*;
@@ -14,6 +12,8 @@ import java.util.*;
 public class ConsoleGenerator implements Observer {
 
     private List<Edge> edges = new ArrayList<>();
+
+    public static final String TMP_POSTFIX = ".tmp";
 
     public ConsoleGenerator() {
 
@@ -66,7 +66,7 @@ public class ConsoleGenerator implements Observer {
             }
 
             timeStamp.setBegin("Writing start");
-            File f = new File(filename);
+            File f = new File(filename + TMP_POSTFIX);
             f.delete();
 
             FileChannel fc = new RandomAccessFile(f, "rw").getChannel();
@@ -79,9 +79,13 @@ public class ConsoleGenerator implements Observer {
             mem.put(mymem);
 
             fc.close();
+Thread.sleep(15000);
+            f.renameTo(new File(filename));
         }
         catch (IOException e)
         {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
@@ -89,7 +93,7 @@ public class ConsoleGenerator implements Observer {
 
         System.out.println("Writing " + timeStamp.toString());
 
-        timeStamp.init();
+        /*timeStamp.init();
 
         timeStamp.setBegin("Serializing JSON start");
 
@@ -120,7 +124,7 @@ public class ConsoleGenerator implements Observer {
 
         timeStamp.setEnd("Writing JSON end");
 
-        System.out.println("Writing JSON " + timeStamp.toString());
+        System.out.println("Writing JSON " + timeStamp.toString());*/
     }
 
     public static void main(String[] args) {
