@@ -3,7 +3,6 @@ package Protocols;
 import calculate.Edge;
 import calculate.KochManager;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -13,12 +12,15 @@ import java.io.ObjectInputStream;
  */
 public class ClientProtocol implements ProtcolNames
 {
-    KochManager kochManager;
+    private KochManager kochManager;
     private State state = State.WAITING;
-    private boolean recivingmode = true;
-    public ClientProtocol(KochManager kochManager)
+    private int level;
+    private boolean all;
+    public ClientProtocol(KochManager kochManager, int level, boolean all)
     {
         this.kochManager = kochManager;
+        this.level = level;
+        this.all = all;
     }
 
     public String processInput(String theInput, InputStream inputStream)
@@ -31,7 +33,7 @@ public class ClientProtocol implements ProtcolNames
             case WAITING:
                 if (theInput.equals(SERVERWAITNG))
                 {
-                    theOutput = 8 + "";
+                    theOutput = String.valueOf(level);
                     state = State.WAITFORLEVELCONFORMATION;
                     break;
                 }
@@ -41,7 +43,7 @@ public class ClientProtocol implements ProtcolNames
             case WAITFORLEVELCONFORMATION:
                 if (theInput.equals(MODETYPEASKING))
                 {
-                    theOutput = CONFORMATION;
+                    theOutput = all ? CONFORMATION : NEGATIVE;
                     state = State.WAITFORMODECONFORMATION;
                     break;
                 }
@@ -63,29 +65,27 @@ public class ClientProtocol implements ProtcolNames
                 break;
             case RECIEVING:
 
-                try (ObjectInputStream strm = new ObjectInputStream(inputStream))
-                {
-                    while (true)
-                    {
+                try {
+                    ObjectInputStream strm = new ObjectInputStream(inputStream);
+                    int edges = strm.readInt();
+
+                    for (int i = 0; i < edges; i++) {
                         Edge e = (Edge) strm.readObject();
                         kochManager.AddEdge(e);
                         kochManager.DrawEdge(e);
                     }
-                }
-                catch (EOFException eofex)
-                {
-
                 }
                 catch (IOException | ClassNotFoundException e)
                 {
                     e.printStackTrace();
                 }
 
-
-                kochManager.drawEdges();
-
+                state = State.DONE_RECEIVING;
                 break;
             case DONE_RECEIVING:
+                theOutput = CLIENTDONE;
+
+                state = State.DONE;
                 break;
         }
 
@@ -103,6 +103,7 @@ public class ClientProtocol implements ProtcolNames
         WAITFORLEVELCONFORMATION,
         WAITFORMODECONFORMATION,
         RECIEVING,
-        DONE_RECEIVING
+        DONE_RECEIVING,
+        DONE
     }
 }

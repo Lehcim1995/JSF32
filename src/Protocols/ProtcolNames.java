@@ -11,6 +11,7 @@ public interface ProtcolNames
     String STARTSENDING = "hier komt die slimheid";
     String SENDINGDONE = "im done bicth give me my money";
     String CONFORMATION = "ja";
+    String NEGATIVE = "nope";
     String CLIENTDONE = "klaaaar";
 
 }

@@ -30,15 +30,23 @@ public class ServerThread extends Thread {
             String inputLine, outputLine;
             ServerProtocol serverProtocol = new ServerProtocol();
             outputLine = serverProtocol.processInput(null, socket.getOutputStream());
+            System.out.println("Server: " + outputLine);
             out.println(outputLine);
 
             while ((inputLine = in.readLine()) != null) {
+                System.out.println("Client: " + inputLine);
                 outputLine = serverProtocol.processInput(inputLine, socket.getOutputStream());
-                out.println(outputLine);
-                if (outputLine.equals("Bye"))
+
+                if (outputLine == null) {
                     break;
+                }
+
+                System.out.println("Server: " + outputLine);
+                out.println(outputLine);
+
             }
             socket.close();
+            System.out.println("Socket closed");
         } catch (IOException e) {
             e.printStackTrace();
         }

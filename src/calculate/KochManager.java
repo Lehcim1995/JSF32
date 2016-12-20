@@ -6,20 +6,22 @@
 package calculate;
 
 import Protocols.ClientProtocol;
-import Threads.ReadDrawEdge;
 import javafx.application.Platform;
-import javafx.stage.FileChooser;
+import javafx.scene.control.TextInputDialog;
 import jsf31kochfractalfx.JSF31KochFractalFX;
 import timeutil.TimeStamp;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Optional;
 
+import static Protocols.ClientProtocol.State.DONE;
 import static Protocols.ClientProtocol.State.RECIEVING;
 
 /**
@@ -45,45 +47,60 @@ public class KochManager {
     }
 
     public synchronized void changeLevel(int currentLevel) {
+        edgeList.clear();
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Change level");
+        dialog.setHeaderText("Change level");
+        dialog.setContentText("New level:");
+
+        Optional<String> result = dialog.showAndWait();
+        String levelString = result.orElse("5");
+        int level = Integer.parseInt(levelString);
 
         String hostName = "localhost";
         int portNumber = 1337;
 
-        try (
-                Socket socket = new Socket(hostName, portNumber);
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream()));
-        ) {
-            BufferedReader stdIn =
-                    new BufferedReader(new InputStreamReader(System.in));
-            String fromServer;
-            String fromUser;
-            ClientProtocol clientProtocol = new ClientProtocol(this);
+        application.clearKochPanel();
 
-            while ((fromServer = in.readLine()) != null) {
-                System.out.println("Server: " + fromServer);
-                if (fromServer.equals("Bye."))
-                    break;
+        new Thread(() -> {
+            try (
+                    Socket socket = new Socket(hostName, portNumber);
+                    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                    BufferedReader in = new BufferedReader(
+                            new InputStreamReader(socket.getInputStream()));
+            ) {
+                BufferedReader stdIn =
+                        new BufferedReader(new InputStreamReader(System.in));
+                String fromServer;
+                String fromUser;
+                ClientProtocol clientProtocol = new ClientProtocol(this, level, false);
 
-                fromUser = clientProtocol.processInput(fromServer, socket.getInputStream());
-                if (fromUser != null) {
-                    System.out.println("Client: " + fromUser);
-                    out.println(fromUser);
+                while ((fromServer = in.readLine()) != null) {
+                    System.out.println("Server: " + fromServer);
+
+                    if (clientProtocol.getState() == DONE) {
+                        break;
+                    }
+
+                    fromUser = clientProtocol.processInput(fromServer, socket.getInputStream());
+                    if (fromUser != null) {
+                        System.out.println("Client: " + fromUser);
+                        out.println(fromUser);
+                    }
+
+                    if (clientProtocol.getState() == RECIEVING) {
+                        clientProtocol.processInput(null, socket.getInputStream());
+                    }
                 }
-
-                if (clientProtocol.getState() == RECIEVING)
-                {
-                    clientProtocol.processInput(null, socket.getInputStream());
-                }
+                socket.close();
+                System.out.println("Socket closed");
+            } catch (UnknownHostException e) {
+                System.err.println("Don't know about host " + hostName);
+            } catch (IOException e) {
+                System.err.println("Couldn't get I/O for the connection to " +
+                        hostName);
             }
-        } catch (UnknownHostException e) {
-            System.err.println("Don't know about host " + hostName);
-        } catch (IOException e) {
-            System.err.println("Couldn't get I/O for the connection to " +
-                    hostName);
-        }
-
+        }).start();
     }
 
     public void RequestDraw() {

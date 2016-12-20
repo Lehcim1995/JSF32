@@ -126,7 +126,7 @@ public class JSF31KochFractalFX extends Application {
 
         // Button to increase level of Koch fractal
         Button buttonChangeFile = new Button();
-        buttonChangeFile.setText("Load File");
+        buttonChangeFile.setText("Load Level");
         buttonChangeFile.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {

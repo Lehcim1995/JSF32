@@ -2,16 +2,15 @@ package Protocols;
 
 import calculate.Edge;
 import calculate.KochFractal;
-import javafx.beans.Observable;
-import javafx.scene.paint.Color;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Observer;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Created by michel on 20-12-2016.
@@ -22,7 +21,11 @@ public class ServerProtocol implements ProtcolNames, Observer
     public void update(java.util.Observable o, Object arg)
     {
         Edge e = (Edge) arg;
-        edgelist.add(e);
+        try {
+            edgeQueue.put(e);
+        } catch (InterruptedException e1) {
+            e1.printStackTrace();
+        }
     }
 
     public enum State
@@ -39,7 +42,9 @@ public class ServerProtocol implements ProtcolNames, Observer
     private boolean SendAll;
     private int level;
     private KochFractal fracttal;
-    private List<Edge> edgelist = new ArrayList<>();
+    private BlockingQueue<Edge> edgeQueue = new LinkedBlockingQueue<>();
+
+    private ExecutorService threadPool = Executors.newFixedThreadPool(3);
 
     public String processInput(String theInput, OutputStream stream) {
         String theOutput = null;
@@ -89,30 +94,67 @@ public class ServerProtocol implements ProtcolNames, Observer
                 fracttal.generateLeftEdge();
                 fracttal.generateRightEdge();
 
-                try (ObjectOutputStream objstream = new ObjectOutputStream(stream))
-                {
-                    for (Edge e : edgelist)
+                try {
+                    ObjectOutputStream objstream = new ObjectOutputStream(stream);
+                    objstream.writeInt(fracttal.getNrOfEdges());
+                    for (Edge e : edgeQueue)
                     {
                         objstream.writeObject(e);
                     }
+                    objstream.flush();
                 }
                 catch (IOException e)
                 {
                     e.printStackTrace();
                 }
 
-                theOutput = "ALL";
+                theOutput = SENDINGDONE;
                 state = State.IMDONE;
 
                 break;
             case SENDINGEDGE:
 
-                theOutput = "a";
+
+                threadPool.submit(() -> {
+                    KochFractal kochFractal = new KochFractal();
+                    kochFractal.setLevel(level);
+                    kochFractal.addObserver(ServerProtocol.this);
+                    kochFractal.generateBottomEdge();
+                });
+                threadPool.submit(() -> {
+                    KochFractal kochFractal = new KochFractal();
+                    kochFractal.setLevel(level);
+                    kochFractal.addObserver(ServerProtocol.this);
+                    kochFractal.generateRightEdge();
+                });
+                threadPool.submit(() -> {
+                    KochFractal kochFractal = new KochFractal();
+                    kochFractal.setLevel(level);
+                    kochFractal.addObserver(ServerProtocol.this);
+                    kochFractal.generateLeftEdge();
+                });
+
+                try {
+                    ObjectOutputStream objstream = new ObjectOutputStream(stream);
+                    objstream.writeInt(fracttal.getNrOfEdges());
+                    System.out.println("Edges: " + fracttal.getNrOfEdges());
+                    for (int i = 0; i < fracttal.getNrOfEdges(); i++) {
+                        Edge e = edgeQueue.take();
+                        objstream.writeObject(e);
+                    }
+                    objstream.flush();
+                }
+                catch (IOException | InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+
+                theOutput = SENDINGDONE;
                 state = State.IMDONE;
+
                 break;
             case IMDONE:
 
-                theOutput = SENDINGDONE;
                 state = State.WAITING;
                 break;
         }
