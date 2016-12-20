@@ -5,17 +5,22 @@
  */
 package calculate;
 
+import Protocols.ClientProtocol;
 import Threads.ReadDrawEdge;
 import javafx.application.Platform;
 import javafx.stage.FileChooser;
 import jsf31kochfractalfx.JSF31KochFractalFX;
 import timeutil.TimeStamp;
 
-import java.io.File;
+import java.io.*;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static Protocols.ClientProtocol.State.RECIEVING;
 
 /**
  * @author michel
@@ -40,26 +45,45 @@ public class KochManager {
     }
 
     public synchronized void changeLevel(int currentLevel) {
-        int edges = 0;
 
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("File");
-        File file = fileChooser.showOpenDialog(application.getStage());
+        String hostName = "localhost";
+        int portNumber = 1337;
 
-        application.clearKochPanel();
+        try (
+                Socket socket = new Socket(hostName, portNumber);
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream()));
+        ) {
+            BufferedReader stdIn =
+                    new BufferedReader(new InputStreamReader(System.in));
+            String fromServer;
+            String fromUser;
+            ClientProtocol clientProtocol = new ClientProtocol(this);
 
-        ReadDrawEdge future = new ReadDrawEdge(file, koch, this);
+            while ((fromServer = in.readLine()) != null) {
+                System.out.println("Server: " + fromServer);
+                if (fromServer.equals("Bye."))
+                    break;
 
-        ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(1);
-        threadPoolExecutor.submit(future);
+                fromUser = clientProtocol.processInput(fromServer, socket.getInputStream());
+                if (fromUser != null) {
+                    System.out.println("Client: " + fromUser);
+                    out.println(fromUser);
+                }
 
-        threadPoolExecutor.shutdown();
+                if (clientProtocol.getState() == RECIEVING)
+                {
+                    clientProtocol.processInput(null, socket.getInputStream());
+                }
+            }
+        } catch (UnknownHostException e) {
+            System.err.println("Don't know about host " + hostName);
+        } catch (IOException e) {
+            System.err.println("Couldn't get I/O for the connection to " +
+                    hostName);
+        }
 
-        /*try {
-            edgeList = future.get();
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }*/
     }
 
     public void RequestDraw() {

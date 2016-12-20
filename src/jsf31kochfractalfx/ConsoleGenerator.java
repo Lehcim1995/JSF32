@@ -1,10 +1,13 @@
 package jsf31kochfractalfx;
 
+import Threads.ServerThread;
 import calculate.Edge;
 import calculate.KochFractal;
 import timeutil.TimeStamp;
 
 import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -14,164 +17,18 @@ public class ConsoleGenerator implements Observer {
 
     private List<Edge> edges = new ArrayList<>();
 
-    public ConsoleGenerator() {
-
-        System.out.println("Level?");
-        Scanner scanner = new Scanner(System.in);
-
-        int level = scanner.nextInt();
-
-        System.out.println("File?");
-
-        String filename = scanner.next();
-
-        if (filename.isEmpty()) {
-            filename = "default_" + level;
-        }
-
-        KochFractal fractal = new KochFractal();
-        fractal.setLevel(level);
-
-        fractal.addObserver(this);
-
-        TimeStamp timeStamp = new TimeStamp();
-        timeStamp.setBegin("Generate start");
-
-        fractal.generateLeftEdge();
-        fractal.generateBottomEdge();
-        fractal.generateRightEdge();
-
-        int edgeCount = fractal.getNrOfEdges();
-
-        timeStamp.setEnd("Generate end");
-
-        System.out.println("Generate " + timeStamp.toString());
-
-        timeStamp.init();
-
-
-        //Binary
-        try (ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream()) {
-            timeStamp.setBegin("Writing start");
-            File f = new File(filename);
-            f.delete();
-
-            FileChannel fc = new RandomAccessFile(f, "rw").getChannel();
-
-            int lastPos = byteOutputStream.size();
-
-            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
-                objectOutputStream.writeInt(level);
-
-                System.out.println(byteOutputStream.size());
-
-                MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, 0, lastPos);
-                FileLock lock = fc.lock(0, lastPos, false);
-                mem.put(byteOutputStream.toByteArray(), 0, lastPos);
-                lock.release();
-
-            }
-            int i = 0;
-
-            List<Edge> toWrite = new ArrayList<>();
-
-            for (Edge edge : edges) {
-                i++;
-
-                toWrite.add(edge);
-
-                if (i % (edgeCount > 100 ? edgeCount / 100 : edgeCount) == 0) {
-                    try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
-                        for (Edge writeEdge : toWrite) {
-                            objectOutputStream.writeObject(writeEdge);
-                        }
-
-                        toWrite.clear();
-
-                        int newLastPos = byteOutputStream.size();
-                        int size = newLastPos - lastPos;
-
-                        MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, lastPos, size);
-                        FileLock lock = fc.lock(lastPos, size, false);
-
-                        mem.put(byteOutputStream.toByteArray(), lastPos, size);
-
-                        lock.release();
-
-                        System.out.println("Writing from " + lastPos + " to " + newLastPos + ".\n Wrote " + i + " edges.");
-                        lastPos = newLastPos;
-                    }
-                }
-            }
-
-            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream)) {
-                for (Edge writeEdge : toWrite) {
-                    objectOutputStream.writeObject(writeEdge);
-                }
-
-                int newLastPos = byteOutputStream.size();
-                int size = newLastPos - lastPos;
-
-                MappedByteBuffer mem = fc.map(FileChannel.MapMode.READ_WRITE, lastPos, size);
-                FileLock lock = fc.lock(lastPos, size, false);
-
-                mem.put(byteOutputStream.toByteArray(), lastPos, size);
-
-                lock.release();
-
-                System.out.println("Writing from " + lastPos + " to " + newLastPos + ".\n Wrote " + i + " edges.");
-            }
-
-            fc.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        /*byte[] mymem = byteOutputStream.toByteArray(); // in bytes
-        long buffer = mymem.length; // buffer size
-        System.out.println("Buffer bytes : " + buffer);*/
-
-        timeStamp.setEnd("Writing end");
-
-        System.out.println("Writing " + timeStamp.toString());
-
-        /*timeStamp.init();
-
-        timeStamp.setBegin("Serializing JSON start");
-
-        Gson gson = new Gson();
-
-        JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("level", level);
-        jsonObject.add("edges", gson.toJsonTree(edges));
-        String json = gson.toJson(jsonObject);
-
-        timeStamp.setEnd("Serializing JSON end");
-
-        System.out.println("Serializing JSON " + timeStamp.toString());
-
-        timeStamp.init();
-
-        timeStamp.setBegin("Writing JSON start");
-
-        try (FileOutputStream outputStream = new FileOutputStream(filename + ".json")) {
-            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream)) {
-                try (OutputStreamWriter outputStreamWriter = new OutputStreamWriter(bufferedOutputStream)) {
-                    outputStreamWriter.write(json);
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        timeStamp.setEnd("Writing JSON end");
-
-        System.out.println("Writing JSON " + timeStamp.toString());*/
-    }
-
     public static void main(String[] args) {
-        new ConsoleGenerator();
+        int portNumber = 1337;
+        boolean listening = true;
+
+        try (ServerSocket serverSocket = new ServerSocket(portNumber)) {
+            while (listening) {
+                new ServerThread(serverSocket.accept()).start();
+            }
+        } catch (IOException e) {
+            System.err.println("Could not listen on port " + portNumber);
+            System.exit(-1);
+        }
     }
 
     @Override
